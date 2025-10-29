@@ -53,12 +53,12 @@ class MapScreen extends StatelessWidget {
           }
 
           // Координаты Ульяновска (домашний город олимпиады)
-          final LatLng ulyanovsk = LatLng(54.314, 48.403);
+          final LatLng ulyanovsk = const LatLng(54.314, 48.403);
 
           return FlutterMap(
             options: MapOptions(
-              center: ulyanovsk,
-              zoom: 12.0,
+              initialCenter: ulyanovsk,
+              initialZoom: 12.0,
             ),
             children: [
               TileLayer(
@@ -68,10 +68,10 @@ class MapScreen extends StatelessWidget {
               MarkerLayer(
                 markers: photosWithGeolocation.map((photo) {
                   return Marker(
-                    width: 40.0,
-                    height: 40.0,
                     point: LatLng(photo.latitude!, photo.longitude!),
-                    builder: (ctx) => GestureDetector(
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
                       onTap: () {
                         Navigator.pushNamed(
                           context,
