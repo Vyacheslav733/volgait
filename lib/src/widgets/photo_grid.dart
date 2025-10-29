@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../models/photo_model.dart';
 
@@ -5,6 +7,37 @@ class PhotoGrid extends StatelessWidget {
   final List<Photo> photos;
 
   const PhotoGrid({super.key, required this.photos});
+
+  Widget _buildImage(Photo photo) {
+    if (photo.path.startsWith('assets/')) {
+      return Image.asset(
+        photo.path,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholder();
+        },
+      );
+    } else {
+      return Image.file(
+        File(photo.path),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholder();
+        },
+      );
+    }
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      color: Colors.grey[300],
+      child: const Icon(Icons.photo, color: Colors.grey),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,18 +61,7 @@ class PhotoGrid extends StatelessWidget {
           },
           child: Stack(
             children: [
-              Image.file(
-                File(photo.path),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.broken_image, color: Colors.grey),
-                  );
-                },
-              ),
+              _buildImage(photo),
               if (!photo.hasGeolocation)
                 const Positioned(
                   top: 4,

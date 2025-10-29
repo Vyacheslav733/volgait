@@ -1,16 +1,31 @@
-# flutter_application_1
+# ГеоАльбом
 
-A new Flutter project.
+Мобильное приложение для просмотра фотографий с отображением на карте.
 
-## Getting Started
+## Функциональность
 
-This project is a starting point for a Flutter application.
+- 📸 Просмотр фотографий из галереи устройства
+- 🗺️ Отображение фотографий на карте по координатам GPS
+- 🔍 Просмотр детальной информации о фотографии
+- 📍 Определение наличия геолокации в фотографиях
 
-A few resources to get you started if this is your first Flutter project:
+## Экран
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. **Галерея** - отображение всех фотографий плиткой
+2. **Просмотр фото** - детальный просмотр с информацией
+3. **Карта** - отображение фотографий с геолокацией на карте
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Технологии
+
+- Flutter
+- flutter_map - для карт
+- provider - для управления состоянием
+- exif - для чтения метаданных фото
+- photo_manager - для доступа к галерее
+
+## Сборка
+
+```bash
+flutter pub get
+flutter-aurora build aurora
+flutter-aurora run

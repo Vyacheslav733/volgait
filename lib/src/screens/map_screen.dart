@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong2.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../services/photo_provider.dart';
 import '../models/photo_model.dart';
@@ -57,7 +57,7 @@ class MapScreen extends StatelessWidget {
           }
 
           // Координаты Москвы (домашний город олимпиады)
-          final LatLng moscow = const LatLng(55.7558, 37.6173);
+          final LatLng moscow = LatLng(55.7558, 37.6173);
 
           return FlutterMap(
             options: MapOptions(

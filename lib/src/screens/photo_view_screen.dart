@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/photo_provider.dart';
@@ -22,6 +23,44 @@ class PhotoViewScreen extends StatelessWidget {
         ),
         body: const Center(child: Text('Фотография не найдена')),
       );
+    }
+
+    Widget _buildImage() {
+      if (photo.path.startsWith('assets/')) {
+        return Image.asset(
+          photo.path,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('Ошибка загрузки изображения'),
+                ],
+              ),
+            );
+          },
+        );
+      } else {
+        return Image.file(
+          File(photo.path),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('Ошибка загрузки изображения'),
+                ],
+              ),
+            );
+          },
+        );
+      }
     }
 
     return Scaffold(
@@ -51,22 +90,7 @@ class PhotoViewScreen extends StatelessWidget {
         children: [
           Expanded(
             child: InteractiveViewer(
-              child: Image.file(
-                File(photo.path),
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text('Ошибка загрузки изображения'),
-                      ],
-                    ),
-                  );
-                },
-              ),
+              child: _buildImage(),
             ),
           ),
           Container(
