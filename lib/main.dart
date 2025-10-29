@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'src/services/photo_provider.dart';
-import 'src/screens/gallery_screen.dart';
-import 'src/screens/photo_view_screen.dart';
-import 'src/screens/map_screen.dart';
+import 'package:flutter_application_1/src/services/photo_provider.dart';
+import 'package:flutter_application_1/src/screens/gallery_screen.dart';
+import 'package:flutter_application_1/src/screens/photo_view_screen.dart';
+import 'package:flutter_application_1/src/screens/map_screen.dart';
 
 void main() {
   runApp(const GeoAlbumApp());

@@ -2,17 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import '../services/photo_provider.dart';
-import '../models/photo_model.dart';
+import 'package:flutter_application_1/src/services/photo_provider.dart';
 
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final String? initialPhotoId =
-        ModalRoute.of(context)!.settings.arguments as String?;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Карта'),
@@ -56,13 +52,13 @@ class MapScreen extends StatelessWidget {
             );
           }
 
-          // Координаты Москвы (домашний город олимпиады)
-          final LatLng moscow = LatLng(55.7558, 37.6173);
+          // Координаты Ульяновска (домашний город олимпиады)
+          final LatLng ulyanovsk = LatLng(54.314, 48.403);
 
           return FlutterMap(
             options: MapOptions(
-              center: moscow,
-              zoom: 10.0,
+              center: ulyanovsk,
+              zoom: 12.0,
             ),
             children: [
               TileLayer(
@@ -85,7 +81,7 @@ class MapScreen extends StatelessWidget {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.7),
+                          color: Colors.blue,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: Colors.white,

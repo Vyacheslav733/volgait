@@ -1,14 +1,13 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
-import '../models/photo_model.dart';
+import 'package:flutter_application_1/src/models/photo_model.dart';
 
 class PhotoGrid extends StatelessWidget {
   final List<Photo> photos;
 
   const PhotoGrid({super.key, required this.photos});
 
-  Widget _buildImage(Photo photo) {
+  Widget _buildImageWidget(Photo photo) {
     if (photo.path.startsWith('assets/')) {
       return Image.asset(
         photo.path,
@@ -16,7 +15,7 @@ class PhotoGrid extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholder();
+          return _buildPlaceholderWidget();
         },
       );
     } else {
@@ -26,13 +25,13 @@ class PhotoGrid extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholder();
+          return _buildPlaceholderWidget();
         },
       );
     }
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildPlaceholderWidget() {
     return Container(
       color: Colors.grey[300],
       child: const Icon(Icons.photo, color: Colors.grey),
@@ -61,7 +60,7 @@ class PhotoGrid extends StatelessWidget {
           },
           child: Stack(
             children: [
-              _buildImage(photo),
+              _buildImageWidget(photo),
               if (!photo.hasGeolocation)
                 const Positioned(
                   top: 4,

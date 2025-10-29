@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/src/services/photo_provider.dart';
+import 'package:flutter_application_1/src/widgets/photo_grid.dart';
 import 'package:provider/provider.dart';
-import '../services/photo_provider.dart';
-import '../widgets/photo_grid.dart';
 
 class GalleryScreen extends StatelessWidget {
   const GalleryScreen({super.key});

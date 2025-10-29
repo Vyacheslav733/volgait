@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/photo_model.dart';
-import 'photo_service.dart';
+import 'package:flutter_application_1/src/models/photo_model.dart';
+import 'package:flutter_application_1/src/services/photo_service.dart';
 
 class PhotoProvider with ChangeNotifier {
   List<Photo> _photos = [];

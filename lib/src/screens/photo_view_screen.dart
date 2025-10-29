@@ -1,11 +1,49 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/photo_provider.dart';
-import '../models/photo_model.dart';
+import 'package:flutter_application_1/src/services/photo_provider.dart';
+import 'package:flutter_application_1/src/models/photo_model.dart';
 
 class PhotoViewScreen extends StatelessWidget {
   const PhotoViewScreen({super.key});
+
+  Widget _buildImageWidget(Photo photo) {
+    if (photo.path.startsWith('assets/')) {
+      return Image.asset(
+        photo.path,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text('Ошибка загрузки изображения'),
+              ],
+            ),
+          );
+        },
+      );
+    } else {
+      return Image.file(
+        File(photo.path),
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text('Ошибка загрузки изображения'),
+              ],
+            ),
+          );
+        },
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,44 +61,6 @@ class PhotoViewScreen extends StatelessWidget {
         ),
         body: const Center(child: Text('Фотография не найдена')),
       );
-    }
-
-    Widget _buildImage() {
-      if (photo.path.startsWith('assets/')) {
-        return Image.asset(
-          photo.path,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Ошибка загрузки изображения'),
-                ],
-              ),
-            );
-          },
-        );
-      } else {
-        return Image.file(
-          File(photo.path),
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Ошибка загрузки изображения'),
-                ],
-              ),
-            );
-          },
-        );
-      }
     }
 
     return Scaffold(
@@ -90,7 +90,7 @@ class PhotoViewScreen extends StatelessWidget {
         children: [
           Expanded(
             child: InteractiveViewer(
-              child: _buildImage(),
+              child: _buildImageWidget(photo),
             ),
           ),
           Container(

@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:exif/exif.dart';
 import 'package:path/path.dart' as path;
-import '../models/photo_model.dart';
+import 'package:flutter_application_1/src/models/photo_model.dart';
 
 class PhotoService {
   static Future<List<Photo>> getPhotos() async {
@@ -17,38 +17,33 @@ class PhotoService {
 
       // Если папки нет, создаем тестовые данные
       if (!await picturesDir.exists()) {
-        print('Папка Pictures не найдена, используем тестовые данные');
         return _createSamplePhotos();
       }
 
       // Получаем список файлов в папке Pictures
       final List<FileSystemEntity> files = picturesDir.listSync();
-      print('Найдено файлов в Pictures: ${files.length}');
 
       for (final FileSystemEntity file in files) {
         if (file is File && _isImageFile(file.path)) {
           try {
-            print('Обрабатываем файл: ${file.path}');
             final Photo photo = await _createPhotoFromFile(file);
             photos.add(photo);
           } catch (e) {
-            print('Ошибка обработки фото ${file.path}: $e');
+            // Пропускаем файлы с ошибками
+            continue;
           }
         }
       }
 
       // Если реальных фото нет, добавляем тестовые
       if (photos.isEmpty) {
-        print('Реальных фото не найдено, добавляем тестовые данные');
         photos.addAll(_createSamplePhotos());
       }
     } catch (e) {
-      print('Ошибка получения фото: $e');
       // Возвращаем тестовые данные в случае ошибки
       return _createSamplePhotos();
     }
 
-    print('Всего загружено фото: ${photos.length}');
     return photos;
   }
 
@@ -65,7 +60,6 @@ class PhotoService {
     try {
       // Читаем EXIF данные с обработкой nullable
       final Map<String?, IfdTag>? exifData = await readExifFromFile(file.path);
-      print('EXIF данные для ${file.path}: ${exifData?.keys}');
 
       if (exifData != null &&
           exifData.containsKey('GPS GPSLatitude') &&
@@ -82,7 +76,7 @@ class PhotoService {
             final IfdTag? latRefTag = exifData['GPS GPSLatitudeRef'];
             if (latRefTag != null) {
               final String? latRef = latRefTag.printable;
-              if (latRef == 'S') latitude = -latitude!;
+              if (latRef == 'S') latitude = -latitude;
             }
           }
 
@@ -90,22 +84,19 @@ class PhotoService {
             final IfdTag? lonRefTag = exifData['GPS GPSLongitudeRef'];
             if (lonRefTag != null) {
               final String? lonRef = lonRefTag.printable;
-              if (lonRef == 'W') longitude = -longitude!;
+              if (lonRef == 'W') longitude = -longitude;
             }
           }
 
           hasGeolocation = true;
-          print('Найдены координаты: $latitude, $longitude');
         }
       }
     } catch (e) {
-      print('Ошибка чтения EXIF для ${file.path}: $e');
       // Для некоторых файлов генерируем случайные координаты вокруг Москвы
       if (!hasGeolocation && Random().nextBool()) {
         latitude = 55.7558 + (Random().nextDouble() - 0.5) * 0.1;
         longitude = 37.6173 + (Random().nextDouble() - 0.5) * 0.1;
         hasGeolocation = true;
-        print('Сгенерированы случайные координаты: $latitude, $longitude');
       }
     }
 
@@ -120,7 +111,6 @@ class PhotoService {
       hasGeolocation: hasGeolocation,
     );
 
-    print('Создано фото: ${photo.title}, геолокация: ${photo.hasGeolocation}');
     return photo;
   }
 
@@ -132,28 +122,28 @@ class PhotoService {
       Photo(
         id: 'sample1',
         path: 'assets/images/sample1.jpg',
-        title: 'Москва - Красная площадь',
+        title: 'Ульяновск - Площадь Ленина',
         creationDate: now.subtract(const Duration(days: 10)),
-        latitude: 55.7539,
-        longitude: 37.6208,
+        latitude: 54.314,
+        longitude: 48.403,
         hasGeolocation: true,
       ),
       Photo(
         id: 'sample2',
         path: 'assets/images/sample2.jpg',
-        title: 'Парк Горького',
+        title: 'Набережная Волги',
         creationDate: now.subtract(const Duration(days: 5)),
-        latitude: 55.7312,
-        longitude: 37.6047,
+        latitude: 54.318,
+        longitude: 48.395,
         hasGeolocation: true,
       ),
       Photo(
         id: 'sample3',
         path: 'assets/images/sample3.jpg',
-        title: 'Воробьевы горы',
+        title: 'Музей Гражданской авиации',
         creationDate: now.subtract(const Duration(days: 3)),
-        latitude: 55.7100,
-        longitude: 37.5495,
+        latitude: 54.308,
+        longitude: 48.385,
         hasGeolocation: true,
       ),
       Photo(
@@ -168,19 +158,19 @@ class PhotoService {
       Photo(
         id: 'sample5',
         path: 'assets/images/sample1.jpg',
-        title: 'Московский Кремль',
+        title: 'Императорский мост',
         creationDate: now.subtract(const Duration(days: 8)),
-        latitude: 55.7520,
-        longitude: 37.6175,
+        latitude: 54.322,
+        longitude: 48.410,
         hasGeolocation: true,
       ),
       Photo(
         id: 'sample6',
         path: 'assets/images/sample2.jpg',
-        title: 'Храм Василия Блаженного',
+        title: 'Парк Дружбы народов',
         creationDate: now.subtract(const Duration(days: 6)),
-        latitude: 55.7525,
-        longitude: 37.6230,
+        latitude: 54.320,
+        longitude: 48.400,
         hasGeolocation: true,
       ),
     ];
@@ -198,22 +188,20 @@ class PhotoService {
         }
       }
     } catch (e) {
-      print('Ошибка конвертации координат: $e');
+      // В случае ошибки возвращаем 0.0
     }
     return 0.0;
   }
 
   static double _parseGpsValue(dynamic value) {
     try {
-      // В пакете exif значения могут быть разных типов
-      // Проверяем основные возможные типы
       if (value is num) {
         return value.toDouble();
       } else if (value is String) {
         return double.tryParse(value) ?? 0.0;
       }
     } catch (e) {
-      print('Ошибка парсинга GPS значения: $e');
+      // В случае ошибки возвращаем 0.0
     }
     return 0.0;
   }
