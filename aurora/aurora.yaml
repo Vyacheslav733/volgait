@@ -1,0 +1,4 @@
+target: aurora-x64
+runtime: 
+  version: 5.1.6.110
+  target: AuroraOS-5.1.6.110-base-x86_64
