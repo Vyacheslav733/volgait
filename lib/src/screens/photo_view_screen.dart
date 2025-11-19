@@ -88,8 +88,10 @@ class PhotoViewScreen extends StatelessWidget {
         return;
       }
 
+      final String fileUri = 'file://${file.path}';
+
       final success = await launchUrl(
-        Uri.file(file.absolute.path),
+        Uri.parse(fileUri),
         mode: LaunchMode.externalApplication,
       );
 
