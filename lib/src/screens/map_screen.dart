@@ -15,331 +15,558 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   double _currentZoom = 12.0;
 
+  void _zoomIn() {
+    setState(() {
+      _currentZoom += 1;
+      if (_currentZoom > 18.0) _currentZoom = 18.0;
+      _mapController.move(_mapController.center, _currentZoom);
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _currentZoom -= 1;
+      if (_currentZoom < 3.0) _currentZoom = 3.0;
+      _mapController.move(_mapController.center, _currentZoom);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController.mapEventStream.listen((event) {
+      setState(() {
+        _currentZoom = _mapController.zoom;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Карта'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.photo_library),
-            onPressed: () {
-              Navigator.pushNamed(context, '/gallery');
-            },
-          ),
-          // Кнопка сброса к Ульяновску
-          IconButton(
-            icon: const Icon(Icons.my_location),
-            onPressed: () {
-              _mapController.move(
-                const LatLng(54.314, 48.403),
-                12.0,
-              );
-              setState(() {
-                _currentZoom = 12.0;
-              });
-            },
-            tooltip: 'Центрировать на Ульяновске',
-          ),
-        ],
-      ),
-      body: Consumer<PhotoProvider>(
-        builder: (context, photoProvider, child) {
-          final photosWithGeolocation = photoProvider.photosWithGeolocation;
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: SafeArea(
+        child: Consumer<PhotoProvider>(
+          builder: (context, photoProvider, child) {
+            final photosWithGeolocation = photoProvider.photosWithGeolocation;
 
-          if (photosWithGeolocation.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.map, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Нет фотографий с геолокацией',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Фотографии с координатами будут отображены на карте',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+            if (photosWithGeolocation.isEmpty) {
+              return _buildEmptyState();
+            }
+
+            return Stack(
+              children: [
+                _buildMap(photosWithGeolocation),
+                _buildAppBar(),
+                _buildZoomControls(),
+                _buildShowAllPhotosButton(photoProvider),
+                _buildInfoPanel(photosWithGeolocation.length),
+              ],
             );
-          }
+          },
+        ),
+      ),
+    );
+  }
 
-          return Stack(
-            children: [
-              // Основная карта
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: const LatLng(54.314, 48.403),
-                  initialZoom: 12.0,
-                  minZoom: 5.0,
-                  maxZoom: 18.0,
-                  onPositionChanged: (position, hasGesture) {
-                    if (hasGesture) {
-                      setState(() {
-                        _currentZoom = position.zoom;
-                      });
-                    }
-                  },
-                ),
-                children: [
-                  // Слой карты OpenStreetMap
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.geo_album',
-                    subdomains: const ['a', 'b', 'c'],
-                  ),
-
-                  // Слой маркеров фотографий
-                  MarkerLayer(
-                    markers: photosWithGeolocation.map((photo) {
-                      return Marker(
-                        point: LatLng(photo.latitude!, photo.longitude!),
-                        width: _getMarkerSize(_currentZoom),
-                        height: _getMarkerSize(_currentZoom),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/photo',
-                              arguments: photo.id,
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.8),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(2, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.photo,
-                              color: Colors.white,
-                              size: _getIconSize(_currentZoom),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                  // Слой центрального маркера Ульяновска
-                  const MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: LatLng(54.314, 48.403),
-                        width: 50,
-                        height: 50,
-                        child: Icon(
-                          Icons.location_city,
-                          color: Colors.red,
-                          size: 40,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black,
-                              blurRadius: 4,
-                              offset: Offset(2, 2),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              // Панель управления зумом
-              Positioned(
-                right: 16,
-                top: 100,
-                child: Column(
-                  children: [
-                    // Кнопка увеличения
-                    FloatingActionButton.small(
-                      heroTag: 'zoom_in',
-                      onPressed: () {
-                        final newZoom = _currentZoom + 1;
-                        if (newZoom <= 18.0) {
-                          _mapController.move(
-                            _mapController.camera.center,
-                            newZoom,
-                          );
-                          setState(() {
-                            _currentZoom = newZoom;
-                          });
-                        }
-                      },
-                      child: const Icon(Icons.add),
-                    ),
-                    const SizedBox(height: 8),
-                    // Отображение текущего зума
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 4,
-                            offset: const Offset(2, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        '${_currentZoom.toStringAsFixed(1)}x',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Кнопка уменьшения
-                    FloatingActionButton.small(
-                      heroTag: 'zoom_out',
-                      onPressed: () {
-                        final newZoom = _currentZoom - 1;
-                        if (newZoom >= 5.0) {
-                          _mapController.move(
-                            _mapController.camera.center,
-                            newZoom,
-                          );
-                          setState(() {
-                            _currentZoom = newZoom;
-                          });
-                        }
-                      },
-                      child: const Icon(Icons.remove),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Информационная панель внизу
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
+  Widget _buildMap(List photosWithGeolocation) {
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: const LatLng(54.314, 48.403),
+        initialZoom: _currentZoom,
+        minZoom: 3.0,
+        maxZoom: 18.0,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+          subdomains: const ['a', 'b', 'c'],
+          userAgentPackageName: 'com.example.geo_album',
+        ),
+        MarkerLayer(
+          markers: photosWithGeolocation.map((photo) {
+            return Marker(
+              point: LatLng(photo.latitude!, photo.longitude!),
+              width: _getMarkerSize(_currentZoom),
+              height: _getMarkerSize(_currentZoom),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(
+                    context,
+                    '/photo',
+                    arguments: photo.id,
+                  );
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.primaryContainer,
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 2.0,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withOpacity(0.3),
                         blurRadius: 8,
                         offset: const Offset(2, 2),
                       ),
                     ],
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Фотографий на карте: ${photosWithGeolocation.length}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Фото',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.location_city,
-                              color: Colors.red, size: 16),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Ульяновск',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.photo_rounded,
+                    color: Colors.white,
+                    size: _getIconSize(_currentZoom),
                   ),
                 ),
               ),
+            );
+          }).toList(),
+        ),
+        const MarkerLayer(
+          markers: [
+            Marker(
+              point: LatLng(54.314, 48.403),
+              width: 60,
+              height: 60,
+              child: Icon(
+                Icons.location_city_rounded,
+                color: Colors.red,
+                size: 48,
+                shadows: [
+                  Shadow(
+                    color: Colors.black,
+                    blurRadius: 8,
+                    offset: Offset(2, 2),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
             ],
-          );
-        },
-      ),
-
-      // Кнопка быстрого приближения к фотографиям
-      floatingActionButton: Consumer<PhotoProvider>(
-        builder: (context, photoProvider, child) {
-          final photos = photoProvider.photosWithGeolocation;
-          if (photos.isEmpty) return const SizedBox();
-
-          return FloatingActionButton(
-            onPressed: () {
-              // Приближаемся к границам всех фотографий
-              final bounds = _calculateBounds(photos);
-              _mapController.fitCamera(
-                CameraFit.bounds(
-                  bounds: bounds,
-                  padding: const EdgeInsets.all(50),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 20, color: Theme.of(context).colorScheme.onSurface),
                 ),
-              );
-            },
-            tooltip: 'Показать все фотографии',
-            child: const Icon(Icons.zoom_out_map),
-          );
-        },
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Карта фотографий',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.photo_library_rounded,
+                      size: 20, color: Theme.of(context).colorScheme.onSurface),
+                ),
+                onPressed: () {
+                  Navigator.pushNamed(context, '/gallery');
+                },
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.map_outlined,
+                        size: 48,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5)),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Нет фотографий с геолокацией',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Фотографии с координатами будут отображены на карте',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppBar() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).colorScheme.surface.withOpacity(0.9),
+              Theme.of(context).colorScheme.surface.withOpacity(0.7),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 20, color: Theme.of(context).colorScheme.onSurface),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Карта фотографий',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.photo_library_rounded,
+                    size: 20, color: Theme.of(context).colorScheme.onSurface),
+              ),
+              onPressed: () {
+                Navigator.pushNamed(context, '/gallery');
+              },
+            ),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.my_location_rounded,
+                    size: 20, color: Theme.of(context).colorScheme.onPrimary),
+              ),
+              onPressed: () {
+                _mapController.move(const LatLng(54.314, 48.403), 12.0);
+                setState(() {
+                  _currentZoom = 12.0;
+                });
+              },
+              tooltip: 'Центрировать на Ульяновске',
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Функция для расчета размера маркера в зависимости от зума
+  Widget _buildZoomControls() {
+    return Positioned(
+      right: 16,
+      top: 100,
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _zoomIn,
+            child: Container(
+              width: 50,
+              height: 50,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(Icons.add_rounded,
+                    size: 24, color: Theme.of(context).colorScheme.onSurface),
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              '${_currentZoom.toStringAsFixed(1)}x',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+            ),
+          ),
+          GestureDetector(
+            onTap: _zoomOut,
+            child: Container(
+              width: 50,
+              height: 50,
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(Icons.remove_rounded,
+                    size: 24, color: Theme.of(context).colorScheme.onSurface),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShowAllPhotosButton(PhotoProvider photoProvider) {
+    final photos = photoProvider.photosWithGeolocation;
+    if (photos.isEmpty) return const SizedBox();
+
+    return Positioned(
+      right: 20,
+      top: 280,
+      child: GestureDetector(
+        onTap: () {
+          final bounds = _calculateBounds(photos);
+          _mapController.fitBounds(
+            bounds,
+            options: const FitBoundsOptions(
+              padding: EdgeInsets.all(80),
+            ),
+          );
+        },
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              Icons.zoom_out_map_rounded,
+              size: 24,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoPanel(int photoCount) {
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 16,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Фотографий на карте:',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
+                      ),
+                ),
+                Text(
+                  '$photoCount',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                _buildLegendItem(
+                  color: Theme.of(context).colorScheme.primary,
+                  icon: Icons.photo_rounded,
+                  text: 'Фото',
+                ),
+                const SizedBox(width: 16),
+                _buildLegendItem(
+                  color: Colors.red,
+                  icon: Icons.location_city_rounded,
+                  text: 'Ульяновск',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem({
+    required Color color,
+    required IconData icon,
+    required String text,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: Icon(
+            icon,
+            size: 8,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+        ),
+      ],
+    );
+  }
+
   double _getMarkerSize(double zoom) {
-    if (zoom < 10) return 20;
-    if (zoom < 13) return 30;
+    if (zoom < 10) return 24;
+    if (zoom < 13) return 32;
     if (zoom < 16) return 40;
-    return 50;
+    return 48;
   }
 
-  // Функция для расчета размера иконки в зависимости от зума
   double _getIconSize(double zoom) {
-    if (zoom < 10) return 12;
-    if (zoom < 13) return 16;
-    if (zoom < 16) return 20;
-    return 24;
+    if (zoom < 10) return 14;
+    if (zoom < 13) return 18;
+    if (zoom < 16) return 22;
+    return 26;
   }
 
-  // Функция для расчета границ всех фотографий
   LatLngBounds _calculateBounds(List photos) {
     double minLat = double.infinity;
     double maxLat = double.negativeInfinity;
@@ -353,7 +580,6 @@ class _MapScreenState extends State<MapScreen> {
       if (photo.longitude! > maxLon) maxLon = photo.longitude!;
     }
 
-    // Добавляем небольшой отступ
     const padding = 0.01;
     return LatLngBounds(
       LatLng(minLat - padding, minLon - padding),
