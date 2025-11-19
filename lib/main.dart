@@ -6,6 +6,7 @@ import 'package:flutter_application_1/src/screens/photo_view_screen.dart';
 import 'package:flutter_application_1/src/screens/map_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const GeoAlbumApp());
 }
 

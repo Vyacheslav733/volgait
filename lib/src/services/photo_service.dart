@@ -1,7 +1,9 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:exif/exif.dart';
 import 'package:path/path.dart' as path;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_application_1/src/models/photo_model.dart';
 
 class PhotoService {
@@ -12,28 +14,26 @@ class PhotoService {
       final Directory homeDir = Directory('/home/user');
       final Directory picturesDir = Directory('${homeDir.path}/Pictures');
 
-      if (!await picturesDir.exists()) {
-        return _createSamplePhotos();
-      }
+      if (await picturesDir.exists()) {
+        final List<FileSystemEntity> files = picturesDir.listSync();
 
-      final List<FileSystemEntity> files = picturesDir.listSync();
-
-      for (final FileSystemEntity file in files) {
-        if (file is File && _isImageFile(file.path)) {
-          try {
-            final Photo photo = await _createPhotoFromFile(file);
-            photos.add(photo);
-          } catch (e) {
-            continue;
+        for (final FileSystemEntity file in files) {
+          if (file is File && _isImageFile(file.path)) {
+            try {
+              final Photo photo = await _createPhotoFromFile(file);
+              photos.add(photo);
+            } catch (e) {
+              continue;
+            }
           }
         }
       }
 
       if (photos.isEmpty) {
-        photos.addAll(_createSamplePhotos());
+        photos.addAll(await _createSamplePhotos());
       }
     } catch (e) {
-      return _createSamplePhotos();
+      photos.addAll(await _createSamplePhotos());
     }
 
     return photos;
@@ -89,49 +89,87 @@ class PhotoService {
       latitude: latitude,
       longitude: longitude,
       hasGeolocation: hasGeolocation,
+      originalPath: file.path,
     );
   }
 
-  static List<Photo> _createSamplePhotos() {
+  static Future<List<Photo>> _createSamplePhotos() async {
     final now = DateTime.now();
-    return [
-      Photo(
-        id: 'sample1',
-        path: 'assets/images/sample1.jpg',
-        title: 'Ульяновск - Площадь Ленина',
-        creationDate: now.subtract(const Duration(days: 10)),
-        latitude: 54.318,
-        longitude: 48.406,
-        hasGeolocation: true,
-      ),
-      Photo(
-        id: 'sample2',
-        path: 'assets/images/sample2.jpg',
-        title: 'Краеведческий музей',
-        creationDate: now.subtract(const Duration(days: 5)),
-        latitude: 54.315,
-        longitude: 48.406,
-        hasGeolocation: true,
-      ),
-      Photo(
-        id: 'sample3',
-        path: 'assets/images/sample3.jpg',
-        title: 'Музей Гражданской авиации',
-        creationDate: now.subtract(const Duration(days: 3)),
-        latitude: 54.291,
-        longitude: 48.233,
-        hasGeolocation: true,
-      ),
-      Photo(
-        id: 'sample4',
-        path: 'assets/images/sample4.jpg',
-        title: 'Фото без геолокации',
-        creationDate: now.subtract(const Duration(days: 1)),
-        latitude: null,
-        longitude: null,
-        hasGeolocation: false,
-      ),
+    final List<Photo> samplePhotos = [];
+
+    final List<Map<String, dynamic>> sampleData = [
+      {
+        'assetPath': 'assets/images/sample1.jpg',
+        'title': 'Ульяновск - Площадь Ленина',
+        'lat': 54.318,
+        'lon': 48.406,
+      },
+      {
+        'assetPath': 'assets/images/sample2.jpg',
+        'title': 'Краеведческий музей',
+        'lat': 54.315,
+        'lon': 48.406,
+      },
+      {
+        'assetPath': 'assets/images/sample3.jpg',
+        'title': 'Музей Гражданской авиации',
+        'lat': 54.291,
+        'lon': 48.233,
+      },
+      {
+        'assetPath': 'assets/images/sample4.jpg',
+        'title': 'Фото без геолокации',
+        'lat': null,
+        'lon': null,
+      },
     ];
+
+    for (final data in sampleData) {
+      try {
+        final tempFile = await _createTempFileFromAsset(data['assetPath']);
+
+        samplePhotos.add(Photo(
+          id: tempFile.path,
+          path: tempFile.path,
+          title: data['title'],
+          creationDate: now.subtract(Duration(days: Random().nextInt(10) + 1)),
+          latitude: data['lat'],
+          longitude: data['lon'],
+          hasGeolocation: data['lat'] != null && data['lon'] != null,
+          originalPath: tempFile.path,
+        ));
+      } catch (e) {
+        samplePhotos.add(Photo(
+          id: '${data['assetPath']}_${Random().nextInt(1000)}',
+          path: data['assetPath'],
+          title: data['title'],
+          creationDate: now.subtract(Duration(days: Random().nextInt(10) + 1)),
+          latitude: data['lat'],
+          longitude: data['lon'],
+          hasGeolocation: data['lat'] != null && data['lon'] != null,
+          originalPath: data['assetPath'],
+        ));
+      }
+    }
+
+    return samplePhotos;
+  }
+
+  static Future<File> _createTempFileFromAsset(String assetPath) async {
+    try {
+      final ByteData data = await rootBundle.load(assetPath);
+      final bytes = data.buffer.asUint8List();
+
+      final tempDir = await Directory.systemTemp.createTemp();
+      final fileName = path.basename(assetPath);
+      final tempFile = File('${tempDir.path}/$fileName');
+
+      await tempFile.writeAsBytes(bytes);
+
+      return tempFile;
+    } catch (e) {
+      throw Exception('Не удалось создать временный файл для asset: $e');
+    }
   }
 
   static double _convertGPSCoordinate(List<dynamic> values) {
@@ -142,7 +180,6 @@ class PhotoService {
         final double seconds = _parseGpsValue(values[2]);
         return degrees + (minutes / 60.0) + (seconds / 3600.0);
       }
-      // ignore: empty_catches
     } catch (e) {}
     return 0.0;
   }
@@ -151,7 +188,6 @@ class PhotoService {
     try {
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value) ?? 0.0;
-      // ignore: empty_catches
     } catch (e) {}
     return 0.0;
   }

@@ -8,6 +8,12 @@ project(com.test.aurora.flutter_application_1 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets)
+
+include_directories(/usr/include/x86_64-linux-gnu/qt5)
+include_directories(/usr/include/x86_64-linux-gnu/qt5/QtCore)
+include_directories(/usr/include/x86_64-linux-gnu/qt5/QtWidgets)
+
 set(BINARY_NAME ${CMAKE_PROJECT_NAME})
 set(FLUTTER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/flutter)
 
@@ -25,6 +31,7 @@ pkg_check_modules(FlutterEmbedder REQUIRED IMPORTED_TARGET flutter-embedder)
 
 add_executable(${BINARY_NAME} main.cpp ${FLUTTER_DIR}/generated_plugin_registrant.cpp)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::FlutterEmbedder)
+target_link_libraries(${BINARY_NAME} PRIVATE Qt5::Core Qt5::Widgets)
 target_include_directories(${BINARY_NAME} PRIVATE ${FLUTTER_DIR})
 
 include(flutter/generated_plugins.cmake)

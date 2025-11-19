@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_application_1/src/models/photo_model.dart';
 import 'package:flutter_application_1/src/services/photo_service.dart';
 
@@ -34,6 +34,37 @@ class PhotoProvider with ChangeNotifier {
       return _photos.firstWhere((photo) => photo.id == id);
     } catch (e) {
       return null;
+    }
+  }
+
+  void updatePhoto(String id,
+      {String? title,
+      String? path,
+      String? originalPath,
+      List<double>? lastCropRect}) {
+    final index = _photos.indexWhere((p) => p.id == id);
+    if (index == -1) return;
+    final current = _photos[index];
+    _photos[index] = current.copyWith(
+      title: title ?? current.title,
+      path: path ?? current.path,
+      originalPath: originalPath ?? current.originalPath,
+      lastCropRect: lastCropRect ?? current.lastCropRect,
+    );
+    notifyListeners();
+  }
+
+  void restoreOriginal(String id) {
+    final index = _photos.indexWhere((p) => p.id == id);
+    if (index == -1) return;
+    final current = _photos[index];
+    if (current.originalPath != null && current.originalPath!.isNotEmpty) {
+      _photos[index] = current.copyWith(
+        path: current.originalPath,
+        originalPath: null,
+        lastCropRect: null,
+      );
+      notifyListeners();
     }
   }
 }
