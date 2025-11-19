@@ -420,7 +420,7 @@ class _MapScreenState extends State<MapScreen> {
     if (photos.isEmpty) return const SizedBox();
 
     return Positioned(
-      right: 16,
+      right: 20,
       top: 280,
       child: GestureDetector(
         onTap: () {
