@@ -180,7 +180,7 @@ class PhotoService {
         final double seconds = _parseGpsValue(values[2]);
         return degrees + (minutes / 60.0) + (seconds / 3600.0);
       }
-    } catch (e) {}
+    } catch (e) {/**/}
     return 0.0;
   }
 
@@ -188,7 +188,7 @@ class PhotoService {
     try {
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value) ?? 0.0;
-    } catch (e) {}
+    } catch (e) {/**/}
     return 0.0;
   }
 }

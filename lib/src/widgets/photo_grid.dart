@@ -33,48 +33,102 @@ class PhotoGrid extends StatelessWidget {
 
   Widget _buildPlaceholderWidget() {
     return Container(
-      color: Colors.grey[300],
-      child: const Icon(Icons.photo, color: Colors.grey),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade200,
+            Colors.grey.shade300,
+          ],
+        ),
+      ),
+      child: Icon(Icons.photo_outlined, color: Colors.grey.shade400, size: 32),
+    );
+  }
+
+  void _openPhoto(BuildContext context, Photo photo) {
+    Navigator.of(context).pushNamed(
+      '/photo',
+      arguments: photo.id,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
+    return SliverGrid(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
       ),
-      itemCount: photos.length,
-      itemBuilder: (context, index) {
-        final photo = photos[index];
-        return GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(
-              context,
-              '/photo',
-              arguments: photo.id,
-            );
-          },
-          child: Stack(
-            children: [
-              _buildImageWidget(photo),
-              if (!photo.hasGeolocation)
-                const Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Icon(
-                    Icons.location_off,
-                    color: Colors.red,
-                    size: 16,
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final photo = photos[index];
+          return GestureDetector(
+            onTap: () => _openPhoto(context, photo),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    Hero(
+                      tag: photo.id,
+                      child: _buildImageWidget(photo),
+                    ),
+                    if (!photo.hasGeolocation)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.location_off_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _openPhoto(context, photo),
+                          splashColor: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.3),
+                          highlightColor: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.1),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-            ],
-          ),
-        );
-      },
+              ),
+            ),
+          );
+        },
+        childCount: photos.length,
+      ),
     );
   }
 }

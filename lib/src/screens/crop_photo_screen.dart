@@ -24,8 +24,8 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
   final GlobalKey _viewportKey = GlobalKey();
 
   Rect? _cropRect;
-  static const double _handleSize = 16;
-  static const double _minCropSide = 40;
+  static const double _handleSize = 20;
+  static const double _minCropSide = 60;
   Rect? _initialRectImage;
   bool _appliedInitialOverlay = false;
 
@@ -86,21 +86,76 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось загрузить изображение')),
+          SnackBar(
+            content: const Text('Не удалось загрузить изображение'),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
         Navigator.pop(context);
       }
     }
   }
 
-  Rect _getDefaultCropRect(Size viewportSize) {
-    final padding = viewportSize.shortestSide * 0.1;
+  Size _calculateImageDisplaySize(Size viewportSize, img.Image image) {
+    final imageAspect = image.width / image.height;
+    final viewportAspect = viewportSize.width / viewportSize.height;
+
+    if (imageAspect > viewportAspect) {
+      final height = viewportSize.width / imageAspect;
+      return Size(viewportSize.width, height);
+    } else {
+      final width = viewportSize.height * imageAspect;
+      return Size(width, viewportSize.height);
+    }
+  }
+
+  Rect _getImageDisplayRect(Size viewportSize, Size imageDisplaySize) {
+    final left = (viewportSize.width - imageDisplaySize.width) / 2;
+    final top = (viewportSize.height - imageDisplaySize.height) / 2;
     return Rect.fromLTWH(
-      padding,
-      padding,
-      viewportSize.width - padding * 2,
-      viewportSize.height - padding * 2,
+      left,
+      top,
+      imageDisplaySize.width,
+      imageDisplaySize.height,
     );
+  }
+
+  Rect _getDefaultCropRect(Size viewportSize, Rect imageDisplayRect) {
+    final padding = imageDisplayRect.shortestSide * 0.05;
+
+    final left = (imageDisplayRect.left + padding)
+        .clamp(imageDisplayRect.left, imageDisplayRect.right - _minCropSide);
+    final top = (imageDisplayRect.top + padding)
+        .clamp(imageDisplayRect.top, imageDisplayRect.bottom - _minCropSide);
+    final right = (imageDisplayRect.right - padding)
+        .clamp(imageDisplayRect.left + _minCropSide, imageDisplayRect.right);
+    final bottom = (imageDisplayRect.bottom - padding)
+        .clamp(imageDisplayRect.top + _minCropSide, imageDisplayRect.bottom);
+
+    final width = right - left;
+    final height = bottom - top;
+
+    if (width < _minCropSide || height < _minCropSide) {
+      final centerX = imageDisplayRect.left + imageDisplayRect.width / 2;
+      final centerY = imageDisplayRect.top + imageDisplayRect.height / 2;
+      final halfSize = _minCropSide / 2;
+
+      return Rect.fromLTRB(
+        (centerX - halfSize).clamp(
+            imageDisplayRect.left, imageDisplayRect.right - _minCropSide),
+        (centerY - halfSize).clamp(
+            imageDisplayRect.top, imageDisplayRect.bottom - _minCropSide),
+        (centerX + halfSize).clamp(
+            imageDisplayRect.left + _minCropSide, imageDisplayRect.right),
+        (centerY + halfSize).clamp(
+            imageDisplayRect.top + _minCropSide, imageDisplayRect.bottom),
+      );
+    }
+
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   Future<void> _onCrop() async {
@@ -133,19 +188,34 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
       final double imageWidth = _decoded!.width.toDouble();
       final double imageHeight = _decoded!.height.toDouble();
 
-      final Rect cropRect = _cropRect ?? _getDefaultCropRect(viewportSize);
+      final imageDisplaySize =
+          _calculateImageDisplaySize(viewportSize, _decoded!);
+      final imageDisplayRect =
+          _getImageDisplayRect(viewportSize, imageDisplaySize);
 
-      final double scaleX = imageWidth / viewportSize.width;
-      final double scaleY = imageHeight / viewportSize.height;
+      final Rect cropRect =
+          _cropRect ?? _getDefaultCropRect(viewportSize, imageDisplayRect);
+
+      final double scaleX = imageWidth / imageDisplaySize.width;
+      final double scaleY = imageHeight / imageDisplaySize.height;
+
+      final double adjustedLeft = (cropRect.left - imageDisplayRect.left)
+          .clamp(0, imageDisplaySize.width);
+      final double adjustedTop = (cropRect.top - imageDisplayRect.top)
+          .clamp(0, imageDisplaySize.height);
+      final double adjustedRight = (cropRect.right - imageDisplayRect.left)
+          .clamp(0, imageDisplaySize.width);
+      final double adjustedBottom = (cropRect.bottom - imageDisplayRect.top)
+          .clamp(0, imageDisplaySize.height);
 
       final int left =
-          (cropRect.left * scaleX).floor().clamp(0, _decoded!.width - 1);
+          (adjustedLeft * scaleX).floor().clamp(0, _decoded!.width - 1);
       final int top =
-          (cropRect.top * scaleY).floor().clamp(0, _decoded!.height - 1);
+          (adjustedTop * scaleY).floor().clamp(0, _decoded!.height - 1);
       final int right =
-          (cropRect.right * scaleX).ceil().clamp(1, _decoded!.width);
+          (adjustedRight * scaleX).ceil().clamp(1, _decoded!.width);
       final int bottom =
-          (cropRect.bottom * scaleY).ceil().clamp(1, _decoded!.height);
+          (adjustedBottom * scaleY).ceil().clamp(1, _decoded!.height);
 
       int width = right - left;
       int height = bottom - top;
@@ -175,11 +245,26 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Фото успешно обрезано'),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обрезки: $e')),
+          SnackBar(
+            content: Text('Ошибка обрезки: $e'),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
       debugPrint('Crop error: $e');
@@ -192,97 +277,295 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
   Widget build(BuildContext context) {
     final decoded = _decoded;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Обрезка фото'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        actions: [
-          Builder(
-            builder: (context) {
-              final photo =
-                  context.watch<PhotoProvider>().getPhotoById(widget.photoId);
-              final canRestore = (photo?.originalPath != null &&
-                  photo!.originalPath!.isNotEmpty &&
-                  photo.path != photo.originalPath);
-              return IconButton(
-                onPressed: _saving || !canRestore
-                    ? null
-                    : () {
-                        context
-                            .read<PhotoProvider>()
-                            .restoreOriginal(widget.photoId);
-                        Navigator.of(context).maybePop(true);
-                      },
-                icon: const Icon(Icons.restore),
-                tooltip: 'Восстановить оригинал',
-              );
-            },
-          ),
-          IconButton(
-            onPressed: _saving || decoded == null
-                ? null
-                : () {
-                    _controller.value = Matrix4.identity();
-                  },
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Сбросить',
-          ),
-          IconButton(
-            onPressed: _saving || decoded == null ? null : _onCrop,
-            icon: const Icon(Icons.check),
-            tooltip: 'Готово',
-          ),
-        ],
-      ),
-      body: Center(
-        child: decoded == null
-            ? const CircularProgressIndicator()
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final size =
-                      math.min(constraints.maxWidth, constraints.maxHeight) *
-                          0.9;
-                  return StatefulBuilder(
-                    builder: (context, setLocal) {
-                      return SizedBox(
-                        key: _viewportKey,
-                        width: size,
-                        height: size,
-                        child: Stack(
-                          children: [
-                            ClipRect(
-                              child: InteractiveViewer(
-                                transformationController: _controller,
-                                minScale: 0.1,
-                                maxScale: 10,
-                                boundaryMargin:
-                                    const EdgeInsets.all(double.infinity),
-                                child: Image.memory(
-                                  _bytes!,
-                                  fit: BoxFit.fill,
-                                  width: size,
-                                  height: size,
-                                ),
-                              ),
-                            ),
-                            Positioned.fill(
-                              child: CropOverlay(
-                                initialRect: _cropRect ??
-                                    _getDefaultCropRect(Size(size, size)),
-                                minSide: _minCropSide,
-                                handleSize: _handleSize,
-                                onChanged: (r) {
-                                  setState(() => _cropRect = r);
-                                },
-                              ),
-                            ),
-                          ],
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.close_rounded,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.onSurface),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Обрезка фото',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
+                  ),
+                  const Spacer(),
+                  Builder(
+                    builder: (context) {
+                      final photo = context
+                          .watch<PhotoProvider>()
+                          .getPhotoById(widget.photoId);
+                      final canRestore = (photo?.originalPath != null &&
+                          photo!.originalPath!.isNotEmpty &&
+                          photo.path != photo.originalPath);
+                      return IconButton(
+                        onPressed: _saving || !canRestore
+                            ? null
+                            : () {
+                                context
+                                    .read<PhotoProvider>()
+                                    .restoreOriginal(widget.photoId);
+                                Navigator.of(context).maybePop(true);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content:
+                                        const Text('Оригинал восстановлен'),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12)),
+                                    backgroundColor:
+                                        Theme.of(context).colorScheme.primary,
+                                  ),
+                                );
+                              },
+                        icon: Icon(Icons.restore_rounded,
+                            color: _saving || !canRestore
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.3)
+                                : Theme.of(context).colorScheme.primary),
+                        tooltip: 'Восстановить оригинал',
                       );
                     },
-                  );
-                },
+                  ),
+                  IconButton(
+                    onPressed: _saving || decoded == null
+                        ? null
+                        : () {
+                            _controller.value = Matrix4.identity();
+                          },
+                    icon: Icon(Icons.refresh_rounded,
+                        color: _saving || decoded == null
+                            ? Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.3)
+                            : Theme.of(context).colorScheme.onSurface),
+                    tooltip: 'Сбросить',
+                  ),
+                ],
               ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Text(
+                'Перетащите углы для обрезки изображения',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6),
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: decoded == null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Загрузка изображения...',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.6),
+                                ),
+                          ),
+                        ],
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final size = math.min(
+                                  constraints.maxWidth, constraints.maxHeight) *
+                              0.85;
+                          final imageDisplaySize = _calculateImageDisplaySize(
+                              Size(size, size), _decoded!);
+                          final imageDisplayRect = _getImageDisplayRect(
+                              Size(size, size), imageDisplaySize);
+
+                          return StatefulBuilder(
+                            builder: (context, setLocal) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: SizedBox(
+                                    key: _viewportKey,
+                                    width: size,
+                                    height: size,
+                                    child: Stack(
+                                      children: [
+                                        Container(
+                                          color: Colors.black.withOpacity(0.1),
+                                        ),
+                                        Center(
+                                          child: InteractiveViewer(
+                                            transformationController:
+                                                _controller,
+                                            minScale: 0.1,
+                                            maxScale: 10,
+                                            boundaryMargin:
+                                                const EdgeInsets.all(
+                                                    double.infinity),
+                                            child: SizedBox(
+                                              width: imageDisplaySize.width,
+                                              height: imageDisplaySize.height,
+                                              child: Image.memory(
+                                                _bytes!,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned.fill(
+                                          child: ImageCropOverlay(
+                                            imageDisplayRect: imageDisplayRect,
+                                            initialRect: _cropRect ??
+                                                _getDefaultCropRect(
+                                                    Size(size, size),
+                                                    imageDisplayRect),
+                                            minSide: _minCropSide,
+                                            handleSize: _handleSize,
+                                            onChanged: (r) {
+                                              setState(() => _cropRect = r);
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onSurface,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                      child: const Text('Отмена'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _saving || decoded == null ? null : _onCrop,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _saving || decoded == null
+                            ? Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.3)
+                            : Theme.of(context).colorScheme.primary,
+                        foregroundColor: _saving || decoded == null
+                            ? Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.5)
+                            : Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _saving
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_rounded, size: 20),
+                                SizedBox(width: 8),
+                                Text('Применить'),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -295,23 +578,27 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
           _viewportKey.currentContext!.findRenderObject() as RenderBox?;
       if (renderBox != null) {
         final viewportSize = renderBox.size;
+        final imageDisplaySize =
+            _calculateImageDisplaySize(viewportSize, _decoded!);
+        final imageDisplayRect =
+            _getImageDisplayRect(viewportSize, imageDisplaySize);
 
         if (_initialRectImage != null) {
           final double imageWidth = _decoded!.width.toDouble();
           final double imageHeight = _decoded!.height.toDouble();
 
-          final double scaleX = viewportSize.width / imageWidth;
-          final double scaleY = viewportSize.height / imageHeight;
+          final double scaleX = imageDisplaySize.width / imageWidth;
+          final double scaleY = imageDisplaySize.height / imageHeight;
 
           final r = _initialRectImage!;
           _cropRect = Rect.fromLTRB(
-            r.left * scaleX,
-            r.top * scaleY,
-            r.right * scaleX,
-            r.bottom * scaleY,
+            imageDisplayRect.left + r.left * scaleX,
+            imageDisplayRect.top + r.top * scaleY,
+            imageDisplayRect.left + r.right * scaleX,
+            imageDisplayRect.top + r.bottom * scaleY,
           );
         } else {
-          _cropRect = _getDefaultCropRect(viewportSize);
+          _cropRect = _getDefaultCropRect(viewportSize, imageDisplayRect);
         }
 
         _appliedInitialOverlay = true;
@@ -321,14 +608,16 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
   }
 }
 
-class CropOverlay extends StatefulWidget {
+class ImageCropOverlay extends StatefulWidget {
+  final Rect imageDisplayRect;
   final Rect? initialRect;
   final ValueChanged<Rect> onChanged;
   final double handleSize;
   final double minSide;
 
-  const CropOverlay({
+  const ImageCropOverlay({
     super.key,
+    required this.imageDisplayRect,
     required this.initialRect,
     required this.onChanged,
     required this.handleSize,
@@ -336,10 +625,10 @@ class CropOverlay extends StatefulWidget {
   });
 
   @override
-  State<CropOverlay> createState() => _CropOverlayState();
+  State<ImageCropOverlay> createState() => _ImageCropOverlayState();
 }
 
-class _CropOverlayState extends State<CropOverlay> {
+class _ImageCropOverlayState extends State<ImageCropOverlay> {
   late Rect _rect;
   Offset? _dragStart;
   Rect? _rectStart;
@@ -348,19 +637,17 @@ class _CropOverlayState extends State<CropOverlay> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final size = (context.findRenderObject() as RenderBox?)?.size ?? Size.zero;
-    _rect = widget.initialRect ?? _initialRectFor(size);
+    _rect = widget.initialRect ?? _initialRectFor();
   }
 
-  Rect _initialRectFor(Size size) {
-    final padding = size.shortestSide * 0.1;
-    final r = Rect.fromLTWH(
-      padding,
-      padding,
-      size.width - padding * 2,
-      size.height - padding * 2,
+  Rect _initialRectFor() {
+    final padding = widget.imageDisplayRect.shortestSide * 0.05;
+    return Rect.fromLTWH(
+      widget.imageDisplayRect.left + padding,
+      widget.imageDisplayRect.top + padding,
+      widget.imageDisplayRect.width - padding * 2,
+      widget.imageDisplayRect.height - padding * 2,
     );
-    return r;
   }
 
   void _notify() => widget.onChanged(_rect);
@@ -380,7 +667,6 @@ class _CropOverlayState extends State<CropOverlay> {
     final localPos = box.globalToLocal(globalPos);
     final delta = localPos - _dragStart!;
     var r = _rectStart!;
-    final bounds = (context.findRenderObject() as RenderBox).size;
 
     switch (_activeHandle) {
       case 'move':
@@ -404,15 +690,23 @@ class _CropOverlayState extends State<CropOverlay> {
         break;
     }
 
+    r = Rect.fromLTRB(
+      r.left.clamp(widget.imageDisplayRect.left, widget.imageDisplayRect.right),
+      r.top.clamp(widget.imageDisplayRect.top, widget.imageDisplayRect.bottom),
+      r.right
+          .clamp(widget.imageDisplayRect.left, widget.imageDisplayRect.right),
+      r.bottom
+          .clamp(widget.imageDisplayRect.top, widget.imageDisplayRect.bottom),
+    );
+
     if (r.width < widget.minSide) {
       final adjust = widget.minSide - r.width;
       if (_activeHandle == 'move') {
         r = Rect.fromLTWH(r.left, r.top, widget.minSide, r.height);
       } else if (_activeHandle == 'tl' || _activeHandle == 'bl') {
-        r = r.translate(-adjust, 0).inflate(0);
-        r = Rect.fromLTRB(r.left, r.top, r.left + widget.minSide, r.bottom);
+        r = Rect.fromLTRB(r.left - adjust, r.top, r.right, r.bottom);
       } else {
-        r = Rect.fromLTRB(r.right - widget.minSide, r.top, r.right, r.bottom);
+        r = Rect.fromLTRB(r.left, r.top, r.right + adjust, r.bottom);
       }
     }
     if (r.height < widget.minSide) {
@@ -420,24 +714,22 @@ class _CropOverlayState extends State<CropOverlay> {
       if (_activeHandle == 'move') {
         r = Rect.fromLTWH(r.left, r.top, r.width, widget.minSide);
       } else if (_activeHandle == 'tl' || _activeHandle == 'tr') {
-        r = r.translate(0, -adjust);
-        r = Rect.fromLTRB(r.left, r.top, r.right, r.top + widget.minSide);
+        r = Rect.fromLTRB(r.left, r.top - adjust, r.right, r.bottom);
       } else {
-        r = Rect.fromLTRB(r.left, r.bottom - widget.minSide, r.right, r.bottom);
+        r = Rect.fromLTRB(r.left, r.top, r.right, r.bottom + adjust);
       }
     }
 
-    final dx = r.left < 0
-        ? -r.left
-        : r.right > bounds.width
-            ? bounds.width - r.right
-            : 0.0;
-    final dy = r.top < 0
-        ? -r.top
-        : r.bottom > bounds.height
-            ? bounds.height - r.bottom
-            : 0.0;
-    r = r.shift(Offset(dx, dy));
+    r = Rect.fromLTRB(
+      r.left.clamp(widget.imageDisplayRect.left,
+          widget.imageDisplayRect.right - widget.minSide),
+      r.top.clamp(widget.imageDisplayRect.top,
+          widget.imageDisplayRect.bottom - widget.minSide),
+      r.right.clamp(widget.imageDisplayRect.left + widget.minSide,
+          widget.imageDisplayRect.right),
+      r.bottom.clamp(widget.imageDisplayRect.top + widget.minSide,
+          widget.imageDisplayRect.bottom),
+    );
 
     setState(() => _rect = r);
     _notify();
@@ -451,34 +743,25 @@ class _CropOverlayState extends State<CropOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (_rect.size == Size.zero) {
-          _rect = _initialRectFor(
-              Size(constraints.maxWidth, constraints.maxHeight));
+    return GestureDetector(
+      onPanStart: (d) {
+        if (_rect.contains(d.localPosition)) {
+          _startDrag('move', d.globalPosition);
         }
-
-        return GestureDetector(
-          onPanStart: (d) {
-            if (_rect.contains(d.localPosition)) {
-              _startDrag('move', d.globalPosition);
-            }
-          },
-          onPanUpdate: (d) => _updateDrag(d.globalPosition),
-          onPanEnd: (_) => _endDrag(),
-          child: CustomPaint(
-            painter: _OverlayPainter(_rect),
-            child: Stack(
-              children: [
-                _buildHandle(_rect.topLeft, 'tl'),
-                _buildHandle(_rect.topRight, 'tr'),
-                _buildHandle(_rect.bottomLeft, 'bl'),
-                _buildHandle(_rect.bottomRight, 'br'),
-              ],
-            ),
-          ),
-        );
       },
+      onPanUpdate: (d) => _updateDrag(d.globalPosition),
+      onPanEnd: (_) => _endDrag(),
+      child: CustomPaint(
+        painter: _ImageOverlayPainter(widget.imageDisplayRect, _rect),
+        child: Stack(
+          children: [
+            _buildHandle(_rect.topLeft, 'tl'),
+            _buildHandle(_rect.topRight, 'tr'),
+            _buildHandle(_rect.bottomLeft, 'bl'),
+            _buildHandle(_rect.bottomRight, 'br'),
+          ],
+        ),
+      ),
     );
   }
 
@@ -494,11 +777,22 @@ class _CropOverlayState extends State<CropOverlay> {
         onPanStart: (d) => _startDrag(id, d.globalPosition),
         onPanUpdate: (d) => _updateDrag(d.globalPosition),
         onPanEnd: (_) => _endDrag(),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
+            border: Border.all(
+              color: Colors.white,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
         ),
       ),
@@ -506,23 +800,68 @@ class _CropOverlayState extends State<CropOverlay> {
   }
 }
 
-class _OverlayPainter extends CustomPainter {
-  final Rect rect;
-  _OverlayPainter(this.rect);
+class _ImageOverlayPainter extends CustomPainter {
+  final Rect imageDisplayRect;
+  final Rect cropRect;
+
+  _ImageOverlayPainter(this.imageDisplayRect, this.cropRect);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final overlayPaint = Paint()..color = Colors.black54;
-    final path = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final hole = Path()..addRect(rect);
-    final combined = Path.combine(PathOperation.difference, path, hole);
-    canvas.drawPath(combined, overlayPaint);
+    final imageOverlayPaint = Paint()..color = Colors.black.withOpacity(0.4);
+    final imagePath = Path()..addRect(imageDisplayRect);
+    final imageHole = Path()..addRect(cropRect);
+    final imageCombined =
+        Path.combine(PathOperation.difference, imagePath, imageHole);
+    canvas.drawPath(imageCombined, imageOverlayPaint);
+
+    final outsideOverlayPaint = Paint()..color = Colors.black.withOpacity(0.6);
+    final outsidePath = Path()
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+    final outsideCombined =
+        Path.combine(PathOperation.difference, outsidePath, imagePath);
+    canvas.drawPath(outsideCombined, outsideOverlayPaint);
 
     final border = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
-    _drawDashedRect(canvas, rect, border, dash: 8, gap: 6);
+
+    final borderGlow = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+
+    canvas.drawRect(cropRect, borderGlow);
+    _drawDashedRect(canvas, cropRect, border, dash: 12, gap: 8);
+
+    final gridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    canvas.drawLine(
+      Offset(cropRect.left + cropRect.width / 3, cropRect.top),
+      Offset(cropRect.left + cropRect.width / 3, cropRect.bottom),
+      gridPaint,
+    );
+    canvas.drawLine(
+      Offset(cropRect.left + cropRect.width * 2 / 3, cropRect.top),
+      Offset(cropRect.left + cropRect.width * 2 / 3, cropRect.bottom),
+      gridPaint,
+    );
+
+    canvas.drawLine(
+      Offset(cropRect.left, cropRect.top + cropRect.height / 3),
+      Offset(cropRect.right, cropRect.top + cropRect.height / 3),
+      gridPaint,
+    );
+    canvas.drawLine(
+      Offset(cropRect.left, cropRect.top + cropRect.height * 2 / 3),
+      Offset(cropRect.right, cropRect.top + cropRect.height * 2 / 3),
+      gridPaint,
+    );
   }
 
   void _drawDashedRect(Canvas canvas, Rect r, Paint paint,
@@ -546,6 +885,7 @@ class _OverlayPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _OverlayPainter oldDelegate) =>
-      oldDelegate.rect != rect;
+  bool shouldRepaint(covariant _ImageOverlayPainter oldDelegate) =>
+      oldDelegate.cropRect != cropRect ||
+      oldDelegate.imageDisplayRect != imageDisplayRect;
 }
